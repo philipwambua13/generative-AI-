@@ -1,54 +1,73 @@
-"""Lecturer Scoring Sheet"""
-
 import from byllm.llm { Model }
 
 
-glob llm = Model(model_name="gemini/gemini-2.0-flash", verbose=False);
+# === Initialize Gemini Model ===
+ glob llm =
+    Model(
+        model_name="gemini/gemini-2.5-flash",
+        # Correct provider prefix
+        api_version="v1",
+        verbose=True
+    );
 
 
-"""Provide feedback based on marks"""
-def evaluate_score(marks: int) -> str by llm();
+# === Lecturer Scoring Walker ===
+ walker LecturerScore {
+    has marks: float;
 
-
-walker ScoreSheet {
-    has marks: int;
-
-    can start with root entry;
-    can assess with turn entry;
-}
-
-
-node turn {
-    has result: str;
-}
-
-
-impl ScoreSheet.start{
-    if not [root-->( ` ? turn ) ] {
+    # --- Grading logic ---
+     def evaluate_student {
         if self.marks < 40 {
-            next = root ++> turn("Fail");
+            return "Fail";
         } elif self.marks >= 40 and self.marks <= 55  {
-            next = root ++> turn("Average Student");
+            return "Average Student";
         } elif self.marks >= 56 and self.marks <= 75  {
-            next = root ++> turn("Above Average Student");
+            return "Above Average Student";
         } elif self.marks >= 76 and self.marks <= 100  {
-            next = root ++> turn("Excellent Student");
+            return "Excellent Student";
         } else {
-            next = root ++> turn("Invalid");
+            return "Invalid — Marks cannot exceed 100.";
         }
-    } else {
-        next = [root-->( ` ? turn ) ];
     }
-    visit next;
+
+    # --- Human-readable explanation ---
+     def explain_score {
+        feedback = self.evaluate_student();
+        return "Student Score: " + str(self.marks) + " marks.\n" + "Performance Category: " + feedback;
+    }
+
+    # --- Gemini AI feedback using byLLM ---
+     """
+    Based on the student's marks and performance level,
+    generate personalized academic feedback.
+
+    Example output (~4–6 lines):
+    - Strengths or weaknesses
+    - Suggested areas of improvement
+    - Motivational or professional feedback tone
+    Keep language concise and lecturer-like.
+    """
+    def generate_ai_feedback(marks: float, feedback: str) -> str by llm();
 }
 
 
-impl ScoreSheet.assess{
-    if [-->] {
-        visit [-->];
-    } else {
-        print("Marks: " + str(self.marks));
-        print("Result: " + here.result);
-        disengage;
+# === Main Script ===
+ walker Script {
+    def main {
+        print("=== LECTURER SCORING SHEET ===");
+        marks = float(input("Enter student's marks (0–100): "));
+        student = LecturerScore(marks=marks);
+        print("\n=== SCORE REPORT ===");
+        print(student.explain_score());
+        category = student.evaluate_student();
+        print("\n=== AI FEEDBACK ===");
+        print(student.generate_ai_feedback(marks=marks, feedback=category));
     }
+}
+
+
+# === Entry point ===
+ with entry {
+    app = Script();
+    app.main();
 }
